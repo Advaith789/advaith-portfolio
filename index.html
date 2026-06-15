@@ -16,7 +16,7 @@
     <div id="loading">
         <div id="spinner"></div>
     </div>
-    <div id="header" class="animated slideInDown" style="animation-delay:1.8s;">
+    <!-- <div id="header" class="animated slideInDown" style="animation-delay:1.8s;"> -->
     <div id="links">
         <a href="#experience">experience</a>
         <a href="#projects" style="margin:0px 60px;">projects</a>
@@ -38,11 +38,11 @@
 <br>
     <center>
         <div id="middle">
-            <div id="tagline" class="animated zoomIn" style="animation-delay:1.8s;">
+            <!-- <div id="tagline" class="animated zoomIn" style="animation-delay:1.8s;"> -->
                 
                 <div id="title">Advaith Chandra</div><br>
                 hey, and welcome. i love to work with <span style="color: #FF416C;">data &lt;3</span><br>
-                <a href="https://drive.google.com/file/d/1i6u4sLbpMglzKINT8Xrv4wVjVKOOR8VR/view?usp=sharing"><button class="btn_one">resume</button></a><a href="https://www.linkedin.com/in/advaithchandrasrivastav/"><button class="btn_one">linkedIn</button></a><a href="https://github.com/Advaith789"><button class="btn_one">github</button></a>
+                <a href="https://drive.google.com/file/d/1TQbcb6oUoZuXQGvMOQF7zRKTGFeAyT9w/view?usp=share_link"><button class="btn_one">resume</button></a><a href="https://www.linkedin.com/in/advaithchandrasrivastav/"><button class="btn_one">linkedIn</button></a><a href="https://github.com/Advaith789"><button class="btn_one">github</button></a>
 
             </div>
             <div id="scroll-indicator">
@@ -59,12 +59,33 @@
                  <h1>experience.</h1>
 
                  <div class="project">
-                 <h2>Data Scientist Intern, Vidal Health (Bengaluru, India)</h2>
-                 <div>• Developed and optimized OCR models using Python, including PaddleOCR and Tesseract, to convert scanned documents of
-                    Doctor notes and Prescriptions to text, with a focus on hyperparameter tuning for enhanced accuracy of 89%.</div>
+                    <h2>Customer Analyst, Lands' End (Dodgeville, WI, USA)</h2>
+                    <div>• Automated the extraction and reporting of customer retention and demand metrics using AWS Glue, Athena, and Power BI,
+                        delivering scheduled email insights to stakeholders and reducing manual reporting workload by 25%.</div>
+
+   
+                   </div>
+
+                   <div class="project">
+                    <h2>Data Engineering Intern, American Family Insurace (Madison, WI, USA)</h2>
+                    <div>• Led AWS to GCP migration of data pipelines using Cloud Composer, BigQuery, and GCS with redesigned ETL pipelines
+                        leveraging BigQuery SQL and dynamic Airflow DAGs, achieving 16x faster processing and 11x cost reduction.</div>
+                       <br>
+                       <div>• Designed E2E architecture diagrams for 2 GCP data pipelines and implemented incremental load methodology across 4
+                        pipelines, optimizing data processing workflows and achieving 33.34% cost savings per pipeline.</div>
+                        <br>
+                        <div>• Recognized in identifying a critical data inconsistency bug during pipeline POC where GCP batch data ingestion contained
+                            65 extra entries compared to AWS real-time data within 10M+ records, enabling production fixes.</div>
+   
+                   </div>
+
+                 <div class="project">
+                 <h2>Data Scientist, Bajaj Finserv - Vidal Health (Bengaluru, India)</h2>
+                 <div>• Directed and constructed a Python-based OCR pipeline (PaddleOCR, Tesseract, Azure Vision, Redshift) for unstructured
+                    clinical handwriting and document identification, executing hyperparameter tuning to achieve 89% inference accuracy.</div>
                     <br>
-                    <div>• Gained advanced skills in image processing and text analysis, utilizing Azure OCR systems and the OpenAI API for Named
-                    Entity Recognition (NER) which was applied in extracting information from text and achieved False Postive rate of 1.2%.</div>
+                    <div>• Engineered a downstream NLP extraction system utilizing OpenAI APIs for Named Entity Recognition (NER), parsing
+                        medical or identification entities with a 1.2% false-positive rate across 11 different document datasets.</div>
 
                 </div>
 
@@ -79,19 +100,19 @@
                    </div>
 
                 <div class="project">
-                    <h2>Data Analyst Intern, Teamlease Digital Services (Bengaluru, India) </h2>
-                    <div>• Created a Flask-based web application with a Jupyter Notebook to track and analyze employee data, PostgreSQL database
-                        administration was integrated, and bespoke API endpoints were tapped to retrieve JSON data.</div>
+                    <h2>Software & Data Intern, Teamlease Digital Services (Bengaluru, India) </h2>
+                    <div>• Architected a Python Flask-based data analytics platform integrated with PostgreSQL, engineering custom RESTful APIs
+                        to efficiently ingest and process complex JSON records utilizing Jupyter, Pandas, NumPy and Tableau.</div>
                        <br>
-                       <div>• 21 interactive Google Charts were made and put on display to show staff insights and analytics and Hosted the application
-                        for safe public testing and access on an NGROK server.</div>
+                       <div>• Developed 21 dynamic Google Charts to visualize critical workforce metrics, securely deploying the WSGI application via
+                        NGROK tunnels for external testing and validation.</div>
    
                    </div>
                 
                 <div class="project">
-                    <h2>Data Analyst Intern, Automatic Data Processing (ADP) (Hyderabad, India) </h2>
-                    <div>• Utilized Pandas to expedite Employee’s dataset, in which data cleansing was performed, created insightful visualizations and
-                        managed JSON data for enhanced data analysis at around 15 graphs.</div>
+                    <h2>ML Engineering Intern, Automatic Data Processing (ADP) (Hyderabad, India) </h2>
+                    <div>• Engineered an XGBoost attrition prediction model achieving 93.8% accuracy, utilizing Pandas to process complex JSON
+                        employee data and extracting key insights through 15+ feature visualizations, which helped to analyze employee lifespan.</div>
    
                    </div> 
                    
@@ -103,6 +124,20 @@
 
                 <div id="projects">
                     <h1>projects.</h1>
+                    <div class="project">
+                        <h2>Optimization of Multi-Warehouse Logistics & Freight Scheduling</h2>
+                        <div>Created a MILP model using GAMSpy & Gurobi to optimize multi-echelon logistics and time-phased JIT shipping schedules, achieving a projected $4.5M annualized cost reduction and boosted On-Time Delivery to 87% by strategically minimizing
+                            freight expenses and inventory holding costs across a complex network of 9,000+ individual customer orders.</div>
+                            <a href="https://github.com/Advaith789/supply_chain_optimization"><button class="btn_one">visit project</button></a>
+                       </div>
+
+                       <div class="project">
+                        <h2>Hybrid NN and Signal Transformation for EEG Brain Anomaly Classification</h2>
+                        <div>Engineered a data pipeline with Fourier & wavelet transforms to extract salient features from raw EEG & spectrogram data,
+                            while architecting a novel hybrid deep learning model, ensembling predictions from CNNs and tree-based models using a logistic
+                            regression learner, achieving a 94% accuracy in the multiclass classification of harmful brain activity from EEG signals.</div>
+                            <a href="https://github.com/Advaith789/brain-waves-classification"><button class="btn_one">visit project</button></a>
+                       </div>
    
                     <div class="project">
                     <h2>JPEG Error Analysis and Its Applications to Digital Image Forensics</h2>
@@ -174,7 +209,7 @@
 
 
                 <div id="middle">
-                    <div id="tagline" class="animated zoomIn" style="animation-delay:1.8s;">
+                    <!-- <div id="tagline" class="animated zoomIn" style="animation-delay:1.8s;"> -->
                         <div id="title">is sky the limit?</div>
                         <div>- kid cudi <span style="color: #FF416C;">&lt;3</span></div>
                     </div>
@@ -195,7 +230,7 @@
                                 <li>Java</li>
                                 <li>C/C++</li>
                                 <li>R</li>
-                                <li>Bash</li>
+                                <li>SQL</li>
                             </ul>
                         </div>
                         <div style="flex: 1; padding-right: 20px;">
@@ -204,14 +239,19 @@
                                 <li>Keras</li>
                                 <li>TensorFlow</li>
                                 <li>PyTorch</li>
-                                <li>Scikit-Learn</li>
+                                <li>Bedrock</li>
+                                Terraform
                             </ul>
                         </div>
                         <div style="flex: 1;">
                             <h2>Others</h2>
                             <ul style="list-style-type: none; padding: 0;">
-                                <li>Amazon Web Services</li>
-                                <li>Microsoft Azure</li>
+                                <li>Amazon Web Services - Redshift, Eks, Athena, EC2, DynamoDB, S3, Glue, Lambda, SageMaker, CloudFormation, Neptune</li>
+                                <li>Microsoft Azure - Vision AI</li>
+                                <li>GCP - GCS, BigQuery, DataFlow, Pub/Sub, Neo4j</li>
+                                <li>Kafka, Spark</li>
+                                <li>Airflow</li>
+                                <li>Scala</li>
                             </ul>
                         </div>
                     </div>
@@ -220,18 +260,14 @@
                     <h1 style="padding-bottom: 10px;">education.</h1>
                     <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; margin-top: 20px;">
                         <div style="flex: 1; padding-right: 20px;">
-                            <h2>2024 — Present</h2>
+                            <h2>September 2024 — May 2026</h2>
                             <p>University of Wisconsin Madison</p>
-                            <p>Master of Science in Data Science (Major)</p>
+                            <p>Master of Science in Data Science</p>
                         </div>
                         <div style="flex: 1; padding-right: 20px;">
-                            <h2>2020 — 2024</h2>
+                            <h2>Spetember 2020 — June 2024</h2>
                             <p>Vellore Institute of Technology</p>
                             <p>Bachelor in Technology in Computer Science</p>
-                        </div>
-                        <div style="flex: 1;">
-                            <h2>2002 — 2018</h2>
-                            <p>Gitanjali Devashala (Hyderabad)</p>
                         </div>
                     </div>
                 </div>
