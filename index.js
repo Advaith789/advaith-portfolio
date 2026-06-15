@@ -1,5 +1,5 @@
 $(document).ready(function(){
-  // Native CSS handles smooth scroll now, but this is kept for broad compatibility
+  // Standardized smooth scroll behavior
   $("a").on('click', function(event) {
       if (this.hash !== "") {
           event.preventDefault();
@@ -13,11 +13,11 @@ $(document).ready(function(){
   });
 });
 
-// Clean and crisp loading screen exit
+// Crisp loading screen fade out
 $(window).on('load', function() {
   setTimeout(function(){
       $("#loading").fadeOut(500, function() {
-          $(this).remove(); // Removes the loader from the DOM completely once done
+          $(this).remove(); // Cleans up the DOM completely once done
       });
   }, 800);
 });
