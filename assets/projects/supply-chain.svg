@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" fill="none" role="img">
+  <rect width="1200" height="750" fill="#F4F3F0"/>
+  <rect x="1.0" y="1.0" width="1198.0" height="748.0" rx="0" fill="none" stroke="#12100E" stroke-width="2" stroke-opacity="0.1"/>
+  <path d="M 120 90 L 120 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 210 90 L 210 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 300 90 L 300 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 390 90 L 390 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 480 90 L 480 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 570 90 L 570 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 660 90 L 660 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 750 90 L 750 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 840 90 L 840 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 930 90 L 930 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 1020 90 L 1020 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 1110 90 L 1110 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 120 L 1110 120" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 210 L 1110 210" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 300 L 1110 300" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 390 L 1110 390" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 480 L 1110 480" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 570 L 1110 570" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 90 660 L 1110 660" fill="none" stroke="#12100E" stroke-width="1" stroke-opacity="0.06" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 300 250 L 180 400" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 300 250 L 520 350" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 620 190 L 520 350" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 620 190 L 700 430" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 620 190 L 860 140" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 900 330 L 700 430" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 900 330 L 960 190" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 900 330 L 1040 520" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 900 330 L 860 140" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 420 520 L 520 350" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 420 520 L 300 620" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 420 520 L 620 660" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 780 560 L 700 430" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 780 560 L 620 660" fill="none" stroke="#12100E" stroke-width="1.2" stroke-opacity="0.22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 300 250 C 480 130 760 150 900 330" fill="none" stroke="#FF4B2B" stroke-width="2.6" stroke-opacity="0.95" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 900 330 C 880 470 840 520 780 560" fill="none" stroke="#FF4B2B" stroke-width="2.6" stroke-opacity="0.95" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="180.0" cy="400.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="520.0" cy="350.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="700.0" cy="430.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="960.0" cy="190.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="1040.0" cy="520.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="300.0" cy="620.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="620.0" cy="660.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <circle cx="860.0" cy="140.0" r="6.0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <rect x="283.0" y="233.0" width="34.0" height="34.0" rx="0" fill="#F4F3F0" stroke="#12100E" stroke-width="2" stroke-opacity="0.85"/>
+  <rect x="292.0" y="242.0" width="16.0" height="16.0" rx="0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <rect x="603.0" y="173.0" width="34.0" height="34.0" rx="0" fill="#F4F3F0" stroke="#12100E" stroke-width="2" stroke-opacity="0.85"/>
+  <rect x="612.0" y="182.0" width="16.0" height="16.0" rx="0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <rect x="883.0" y="313.0" width="34.0" height="34.0" rx="0" fill="#F4F3F0" stroke="#12100E" stroke-width="2" stroke-opacity="0.85"/>
+  <rect x="892.0" y="322.0" width="16.0" height="16.0" rx="0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <rect x="403.0" y="503.0" width="34.0" height="34.0" rx="0" fill="#F4F3F0" stroke="#12100E" stroke-width="2" stroke-opacity="0.85"/>
+  <rect x="412.0" y="512.0" width="16.0" height="16.0" rx="0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+  <rect x="763.0" y="543.0" width="34.0" height="34.0" rx="0" fill="#F4F3F0" stroke="#12100E" stroke-width="2" stroke-opacity="0.85"/>
+  <rect x="772.0" y="552.0" width="16.0" height="16.0" rx="0" fill="none" stroke="#12100E" stroke-width="1.4" stroke-opacity="0.35"/>
+</svg>
