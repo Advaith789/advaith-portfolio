@@ -129,6 +129,9 @@ main { min-height: 60vh; }
 .page-head h1 { margin-bottom: 1.5rem; }
 
 .section { padding-block: clamp(48px, 7vw, 84px); }
+
+/* keep anchored sections clear of the fixed nav */
+[id] { scroll-margin-top: calc(var(--nav-h) + 24px); }
 .section-tight { padding-block: clamp(32px, 4vw, 52px); }
 
 .rule {
@@ -349,10 +352,11 @@ body.menu-open { overflow: hidden; }
 }
 
 .avatar {
-    width: 52px;
-    height: 52px;
+    width: 78px;
+    height: 78px;
     border-radius: 50%;
     object-fit: cover;
+    object-position: 42% center;
     background: var(--bg-soft);
     flex: none;
 }
@@ -524,6 +528,28 @@ body.menu-open { overflow: hidden; }
 }
 
 .entry:hover .entry-photo img { transform: scale(1.02); }
+
+/* contact strip of supporting photos, sitting under an entry's text */
+.photo-strip {
+    grid-column: 2 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 26px;
+}
+
+.photo-strip figure { margin: 0; }
+
+.photo-strip img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--bg-soft);
+    transition: transform 0.6s var(--ease);
+}
+
+.photo-strip figure:hover img { transform: scale(1.02); }
 
 .entry-meta {
     font-family: var(--mono);
@@ -801,6 +827,12 @@ body.menu-open { overflow: hidden; }
     .entry-logo { margin-bottom: 14px; }
 
     .entry-photo img { aspect-ratio: 16 / 10; }
+
+    .photo-strip {
+        grid-column: 1 / -1;
+        gap: 8px;
+        margin-top: 18px;
+    }
 
     .grid { grid-template-columns: 1fr; }
 

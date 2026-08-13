@@ -33,3 +33,5 @@ assets/projects/    generated cover art, one svg per project
   different heights to look the same size, so there is no shared value.
 - Role photos are cropped by the `.entry-photo` frame (4:5 on desktop, 16:10
   stacked). Where the subject is off-centre, `object-position` is set inline.
+- An entry can carry extra supporting shots in a `.photo-strip` (see the
+  Toastmasters entry) — it spans the text and photo columns as a contact strip.
