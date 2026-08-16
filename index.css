@@ -500,6 +500,9 @@ body.menu-open { overflow: hidden; }
 /* stacked marks need more room than wordmarks to read at the same weight */
 .entry-logo.tall { height: 54px; }
 
+/* logos lifted off a white document rather than supplied transparent */
+.entry-logo.on-white { mix-blend-mode: multiply; }
+
 .entry:hover .entry-logo {
     filter: none;
     opacity: 1;
