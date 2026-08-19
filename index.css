@@ -121,12 +121,20 @@ strong, b { font-weight: 500; color: var(--ink); }
 
 main { min-height: 60vh; }
 
-.page-head {
-    padding-top: calc(var(--nav-h) + clamp(70px, 11vw, 140px));
-    padding-bottom: clamp(48px, 7vw, 86px);
+/* one long page: each section gets a hairline and a lot of air above it */
+.page-section {
+    padding-top: clamp(56px, 8vw, 104px);
+    border-top: 1px solid var(--line);
 }
 
-.page-head h1 { margin-bottom: 1.5rem; }
+.section-head { padding-bottom: clamp(40px, 5vw, 64px); }
+
+.section-title {
+    font-size: clamp(2.3rem, 5.6vw, 3.85rem);
+    letter-spacing: -0.04em;
+    line-height: 1.06;
+    margin-bottom: 1.5rem;
+}
 
 .section { padding-block: clamp(48px, 7vw, 84px); }
 
@@ -205,9 +213,11 @@ main { min-height: 60vh; }
 
 .nav-links a:hover { color: var(--ink); }
 
-.nav-links a[aria-current="page"] { color: var(--ink); }
+.nav-links a[aria-current="page"],
+.nav-links a.is-active { color: var(--ink); }
 
-.nav-links a[aria-current="page"]::after {
+.nav-links a[aria-current="page"]::after,
+.nav-links a.is-active::after {
     content: "";
     position: absolute;
     left: 0;

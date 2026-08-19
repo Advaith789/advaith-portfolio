@@ -41,6 +41,37 @@
     });
   }
 
+  /* one page, so the nav underlines whichever section you are reading */
+  var navLinks = Array.prototype.slice.call(
+    document.querySelectorAll('.nav-links a[href^="#"]')
+  );
+  var sections = navLinks
+    .map(function (a) { return document.querySelector(a.getAttribute("href")); })
+    .filter(Boolean);
+
+  if (sections.length && "IntersectionObserver" in window) {
+    var setActive = function (id) {
+      navLinks.forEach(function (a) {
+        a.classList.toggle("is-active", a.getAttribute("href") === "#" + id);
+      });
+    };
+
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) setActive(entry.target.id);
+      });
+    }, { rootMargin: "-45% 0px -50% 0px" });
+
+    sections.forEach(function (el) { spy.observe(el); });
+
+    /* above the first section nothing should be underlined */
+    window.addEventListener("scroll", function () {
+      if (window.scrollY < sections[0].offsetTop - window.innerHeight / 2) {
+        navLinks.forEach(function (a) { a.classList.remove("is-active"); });
+      }
+    }, { passive: true });
+  }
+
   /* reveal on scroll — anything tagged .reveal, staggered per group */
   var targets = document.querySelectorAll(".reveal");
 
