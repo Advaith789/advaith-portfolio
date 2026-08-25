@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>blog — Advaith Chandra Srivastav</title>
+    <meta name="description" content="Notes from the build: what broke, what I measured, and what I got wrong — starting with a Kubernetes operator for vLLM.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff4b2b'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC5VYM7ZC9"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-BC5VYM7ZC9');
+    </script>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a class="brand" href="index.html" aria-label="home">advaith chandra</a>
+        <div class="nav-links">
+            <a href="index.html#experience">experience</a>
+            <a href="index.html#education">education</a>
+            <a href="index.html#projects">projects</a>
+            <a href="index.html#publications">publications</a>
+            <a href="index.html#skills">skills</a>
+            <a href="blogs.html" aria-current="page">blog</a>
+            <a href="index.html#contact">contact</a>
+        </div>
+        <button class="nav-toggle" aria-expanded="false" aria-label="open menu" aria-controls="menu">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</nav>
+
+<div class="menu" id="menu">
+    <a href="index.html#experience">experience</a>
+    <a href="index.html#education">education</a>
+    <a href="index.html#projects">projects</a>
+    <a href="index.html#publications">publications</a>
+    <a href="index.html#skills">skills</a>
+    <a href="blogs.html">blog</a>
+    <a href="index.html#contact">contact</a>
+</div>
+
+<main>
+    <header class="page-head wrap">
+        <span class="eyebrow reveal">06 &mdash; blog</span>
+        <h1 class="reveal">notes from<br><span class="muted">the build.</span></h1>
+        <p class="lede reveal" style="margin-top:1.5rem">what i'm building, what broke while i built it, and the numbers i actually measured. one post per project, written while it's still fresh.</p>
+    </header>
+
+    <div class="wrap">
+    <header class="post-head reveal" id="vllm-k8s-operator">
+        <div class="post-meta">
+            <span>august 2026</span><span class="sep">/</span>
+            <span>kubernetes &middot; vllm</span><span class="sep">/</span>
+            <span>12 min read</span>
+        </div>
+
+        <h1 class="post-title">I hadn't written a Kubernetes operator, so I wrote one for vLLM</h1>
+    </header>
+
+    <article class="post reveal">
+        <p>A job I wanted asked for Kubernetes operator experience and for debugging hardware issues. I had neither on paper. So I wrote a small vLLM operator &mdash; a CRD that takes a model, a tensor-parallel size and a GPU memory fraction, and reconciles it into serving pods &mdash; and then spent most of my time not on the happy path, but on the three reconciliation problems nobody writes about.</p>
+
+        <div class="note">
+            <span class="label">status</span>
+            <p>Draft &mdash; 2 of 4 experiments complete. Finished: <code>admission</code> and <code>probes</code>. Still running on my cluster: <code>rollout</code> and <code>gpu-health</code>. Those sections are marked inline; the prose around them is final.</p>
+        </div>
+
+        <h2><span class="n">00</span>Read this before you trust any number</h2>
+
+        <p>I don't have a GPU. Everything on the Kubernetes side of this is real: a real three-node cluster, the real scheduler, real kubelet probes, real <code>EndpointSlice</code> propagation, a real operator process reconciling real <code>nvidia.com/gpu</code> extended resources that the scheduler enforces. What is <em>not</em> real is the engine. <code>sim/fakevllm.py</code> is a simulator that reproduces vLLM's startup phases and its memory arithmetic &mdash; weights, CUDA context, the profile run, the KV cache carve-out, CUDA graph capture &mdash; with per-phase timings scaled from published A10 numbers.</p>
+
+        <p>So the control-loop behaviour transfers and the throughput numbers do not exist. I have deliberately not reported a single token/sec figure. Twice during this build the simulator was wrong in a way that changed a result, and both times the bug turned out to be the interesting part.</p>
+
+        <h2><span class="n">01</span>The readiness probe question has two answers pulling in opposite directions</h2>
+
+        <p>vLLM allocates its KV cache at startup, after loading weights. Between process start and "can serve a request" there are minutes. That single fact breaks readiness probes in two directions at once, and which one bites you depends on how you deploy.</p>
+
+        <h3>Direction one: the probe is too strict, and kills a healthy pod</h3>
+
+        <p>Stock <code>vllm serve</code> does not open its HTTP port until the engine is up. A liveness probe with Kubernetes' default budget &mdash; <code>periodSeconds: 10</code>, <code>failureThreshold: 3</code> &mdash; gives the pod 30 seconds. An 8B model takes about 115. The kubelet kills it, the container restarts, it gets killed again. CrashLoopBackOff, forever, on a pod whose only problem is that it was told to load a large model. This is the most common vLLM-on-Kubernetes bug and it is entirely self-inflicted.</p>
+
+        <h3>Direction two: the probe is too permissive, and routes traffic into a pod that can't serve</h3>
+
+        <p>Put vLLM behind a proxy, or run it with a multi-process API server, and the port answers immediately. A <code>tcpSocket</code> probe passes at t&nbsp;&asymp;&nbsp;0. The pod joins the Service. Requests arrive at an engine with no KV cache.</p>
+
+        <p>Same model, same load, four probe contracts in the stock topology. <em>Served</em> counts the whole 220&nbsp;s window including the ~117&nbsp;s cold start, during which every strategy is correctly unavailable:</p>
+
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>probe</th>
+                        <th class="num">in endpoints</th>
+                        <th class="num">engine ready</th>
+                        <th>blind window</th>
+                        <th class="num">misrouted</th>
+                        <th class="num">restarts</th>
+                        <th class="num">served</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>naive</code></td><td class="num">&mdash;</td><td class="num">&mdash;</td><td>never ready</td><td class="num">0</td><td class="num">5</td><td class="num">0%</td></tr>
+                    <tr><td><code>tcpSocket</code></td><td class="num">120.1s</td><td class="num">117.1s</td><td>clean</td><td class="num">0</td><td class="num">0</td><td class="num">60%</td></tr>
+                    <tr><td><code>health</code></td><td class="num">120.7s</td><td class="num">116.7s</td><td>clean</td><td class="num">0</td><td class="num">0</td><td class="num">60%</td></tr>
+                    <tr class="is-key"><td><code>kvGate</code></td><td class="num">121.8s</td><td class="num">116.8s</td><td>clean</td><td class="num">0</td><td class="num">0</td><td class="num">60%</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>In this topology every contract except <code>naive</code> looks identical, and that is the point: the column that separates them is <em>misrouted</em>, and it only lights up in the proxied topology, where the port answers before the engine does. <code>/health</code> behaves exactly like <code>tcpSocket</code> there, because "the HTTP server is up" and "the engine has capacity" are different questions and only one of them is being asked. Those runs are still going; I'm not going to quote a number I haven't measured.</p>
+
+        <p>The contract that works is <code>kvGate</code>, and the interesting part is that it is not a probe at all. A <code>startupProbe</code> with a large <code>failureThreshold</code> absorbs the weight load &mdash; liveness is not armed until startup succeeds, Kubernetes guarantees that ordering, and it is the entire fix for direction one. Readiness hits <code>/ready</code>. And then a pod readiness gate lets the <em>operator</em>, not the kubelet, hold the final vote:</p>
+
+<pre><code>spec:
+  readinessGates:
+    - conditionType: serving.vllmops.io/kv-cache-ready</code></pre>
+
+        <p>The operator scrapes <code>/metrics</code> on the pod IP, looks for <code>vllm:num_gpu_blocks &gt; 0</code>, and patches that condition. Until it does, the pod stays out of Service endpoints no matter how cheerful the kubelet is. Readiness gates are an obscure corner of the pod API and they are exactly right here, because "does this engine have a KV cache" is a question only something holding a model of vLLM can answer.</p>
+
+        <h2><span class="n">02</span>What I got wrong, twice</h2>
+
+        <h3>The port was open the whole time</h3>
+
+        <p>My first probe results were nonsense &mdash; <code>tcpSocket</code> passing instantly in a topology where the port was supposed to be shut. <code>ThreadingHTTPServer(...)</code> binds <em>and listens</em> in its constructor; I was delaying only <code>serve_forever()</code>. So the socket was accepting connections into the backlog for the entire weight load while nothing answered them.</p>
+
+        <p>My simulator bug is also a real deployment bug: a TCP probe against a listening socket with no accept loop passes happily. That is one more reason <code>tcpSocket</code> is the wrong probe for this workload.</p>
+
+        <h3>The pod that would not die</h3>
+
+        <p>My <code>naive</code> arm did not CrashLoopBackOff the way I predicted. It was killed at ~32&nbsp;s and did not actually terminate until ~152&nbsp;s &mdash; and in between it finished loading, served traffic for thirty seconds, then vanished mid-request.</p>
+
+        <p>Linux applies no default signal disposition to PID&nbsp;1, so a Python process running as PID&nbsp;1 with no <code>SIGTERM</code> handler simply <em>ignores</em> it. Every kubelet-ordered kill then stalls for the full <code>terminationGracePeriodSeconds</code>. Measured directly: 1&nbsp;s to stop with a handler, the entire timeout without one. That interacts badly with this workload specifically, because vLLM needs a long grace period to drain in-flight decodes &mdash; the longer you make it for good reasons, the longer a condemned pod lingers.</p>
+
+        <h2><span class="n">03</span>Rolling out when the replacement needs a GPU you don't have</h2>
+
+        <p>A Deployment's rolling update assumes pods are cheap and interchangeable. A vLLM pod is neither: it takes minutes to become useful and it holds a GPU that its own replacement also needs. With one GPU and <code>maxSurge: 1</code>, the surge pod is unschedulable &mdash; it is waiting for a device held by the pod it is meant to replace. The rollout does not fail. It just never finishes.</p>
+
+        <p>So the operator reads real spare capacity and picks a strategy. When a GPU is free it surges: build the replacement, wait for its KV cache, then retire the incumbent &mdash; zero downtime, one GPU of headroom for the duration. When nothing is free it drains first: flip the pod's <code>serving</code> label so <code>EndpointSlice</code> propagation pulls it out of rotation, poll <code>vllm:num_requests_running</code> until in-flight decodes finish, <em>then</em> delete and rebuild.</p>
+
+        <p>Drain-first does not avoid the downtime; nothing can, because the replacement cannot start until the GPU is released. What it buys is that the rollout completes and no request is cut mid-stream.</p>
+
+        <p>There is a bug here I shipped and then found. My first spare-GPU calculation was allocatable-minus-allocated, which is the obvious definition and wrong: a node can be Ready and still refuse the surge pod because it is cordoned, NotReady, or carrying a <code>NoSchedule</code> taint. Counting those as spare made the operator choose Surge and then deadlock waiting for a pod the scheduler would never place &mdash; reproducing the exact Deployment failure it exists to prevent.</p>
+
+        <div class="note">
+            <span class="label">results pending</span>
+            <p>Experiment 2 hasn't finished on this machine. Each arm is a live cluster run and an 8B weight load alone is ~115&nbsp;s.</p>
+        </div>
+
+        <h2><span class="n">04</span>How does an operator know a GPU is sick?</h2>
+
+        <p>This is the one I most wanted to answer. Kubernetes has no concept of a degraded GPU. The device plugin advertises <code>nvidia.com/gpu: 1</code> because the device <em>enumerates</em>, not because it <em>works</em>. A GPU that throws Xid 79 and falls off the bus is still counted, so the scheduler keeps placing pods there and the pods keep dying, with no signal anywhere in the Kubernetes API.</p>
+
+        <p>A DaemonSet tails the kernel log for <code>NVRM: Xid</code> lines and translates node-fault ones into a node condition plus a <code>NoSchedule</code> taint. The operator watches for that, evicts its pods, and excludes the node from <code>nodeAffinity</code>. The classification is the whole job &mdash; an agent that cordons on <em>any</em> Xid is worse than no agent:</p>
+
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>class</th><th>xids</th><th>what it means</th><th>node action</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>APP</code></td><td>13, 31, 43, 45</td><td>illegal instruction, out-of-bounds access &mdash; the <em>workload</em> misbehaved</td><td>none</td></tr>
+                    <tr class="is-key"><td><code>FATAL</code></td><td>48, 64, 74, 79, 95, 119</td><td>uncorrectable ECC, NVLink failure, GPU off the bus</td><td>cordon now</td></tr>
+                    <tr><td><code>DEGRADE</code></td><td>63, 92, 94</td><td>ECC page retirement, rising single-bit rate</td><td>cordon past a threshold</td></tr>
+                    <tr><td><code>UNKNOWN</code></td><td>anything else</td><td>&mdash;</td><td>none, and say so</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Xid 13 and 31 are the most common Xids in an inference fleet and they are overwhelmingly the application's fault. Cordoning on those means one user's malformed request drains healthy capacity across your cluster. Being wrong in the permissive direction costs one pod restart; being wrong in the aggressive direction costs a node. So <code>UNKNOWN</code> fails toward keeping the node in service.</p>
+
+        <div class="note">
+            <span class="label">results pending</span>
+            <p>Experiment 3 is still running. The baseline arm is vanilla Kubernetes: the pod restarts on the same broken GPU indefinitely, because nothing in the system has any idea the device is bad.</p>
+        </div>
+
+        <h2><span class="n">05</span>The part I didn't plan: don't schedule pods you can prove will fail</h2>
+
+        <p>Everything vLLM discovers during its profile run is a pure function of the model architecture, <code>tensor-parallel-size</code>, <code>max-num-seqs</code>, <code>max-model-len</code>, <code>gpu-memory-utilization</code> and total GPU memory. None of it requires a GPU to compute. So the operator runs vLLM's own arithmetic at admission and refuses to create a pod that cannot allocate a KV cache.</p>
+
+        <p>Across 24 of 24 configurations, exact KV-block agreement. <code>predict()</code> costs 1.24&nbsp;&micro;s; the engine needs 102.7&ndash;270.1&nbsp;s to reach the same verdict. That is the whole argument for admission control: the same answer, eight orders of magnitude cheaper, delivered as a status condition instead of a CrashLoopBackOff.</p>
+
+        <p>It also surfaced something I did not expect. There is a <em>window</em> of <code>gpu-memory-utilization</code> that boots, bounded below by "no memory left for the KV cache" and above by "no headroom left for CUDA graph capture" &mdash; and raising <code>max-num-seqs</code> narrows it from <em>both</em> ends, because the profile run's peak activation grows and so does the graph pool:</p>
+
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th class="num">max-num-seqs</th><th>utilization that boots</th><th class="num">width</th><th class="num">best</th><th class="num">kv blocks</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">16</td><td>0.675 &ndash; 0.95</td><td class="num">0.275</td><td class="num">0.95</td><td class="num">3,383</td></tr>
+                    <tr><td class="num">32</td><td>0.68 &ndash; 0.95</td><td class="num">0.270</td><td class="num">0.95</td><td class="num">3,365</td></tr>
+                    <tr><td class="num">64</td><td>0.68 &ndash; 0.945</td><td class="num">0.265</td><td class="num">0.945</td><td class="num">3,269</td></tr>
+                    <tr><td class="num">128</td><td>0.685 &ndash; 0.945</td><td class="num">0.260</td><td class="num">0.945</td><td class="num">3,198</td></tr>
+                    <tr><td class="num">256</td><td>0.7 &ndash; 0.94</td><td class="num">0.240</td><td class="num">0.94</td><td class="num">2,996</td></tr>
+                    <tr class="is-key"><td class="num">512</td><td>0.72 &ndash; 0.925</td><td class="num">0.205</td><td class="num">0.925</td><td class="num">2,530</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>The upper bound is the nasty one, because it fails <em>late</em> &mdash; after the weight load, after the port is open, after a naive probe has already passed. The operator reports the feasible range in <code>status.admission</code>, so a user who picked a bad number gets told a good one.</p>
+
+        <h2><span class="n">06</span>What I'd fix next</h2>
+
+        <ul class="bullets">
+            <li><strong>Calibrate the predictor against real hardware.</strong> Its structure is right; its constants &mdash; CUDA context size, fragmentation headroom, activation scaling &mdash; are estimates. On a real A10 I'd fit them against <code>nvidia-smi</code> and vLLM's own logged block count, and treat a prediction/actual mismatch as a reportable operator error rather than silently trusting the model.</li>
+            <li><strong>Quarantine needs a way back.</strong> A cordoned node stays cordoned until something clears the condition. Real recovery means a GPU reset, a re-check of ECC retired-page counts, and an un-taint &mdash; with hysteresis, so a flapping device doesn't oscillate.</li>
+            <li><strong>Drain-first should pre-warm.</strong> Nothing stops the operator pre-pulling the image and warming the weights into page cache on the target node <em>before</em> it releases the GPU. That should cut a meaningful slice off the downtime, and it's the highest-value thing left.</li>
+            <li><strong>Multi-node tensor parallelism is unhandled.</strong> <code>tp &gt; 8</code> means gang-scheduling across nodes, and every decision above gets harder when a "replica" is a set of pods that must live or die together.</li>
+            <li><strong>No PodDisruptionBudget, no leader election.</strong> Two operator replicas would fight. A single replica is a cop-out I'd rather fix than document.</li>
+        </ul>
+
+        <h2><span class="n">07</span>Run it</h2>
+
+        <p>Everything here is reproducible on a laptop &mdash; no GPU required, because the engine is simulated and the cluster is not:</p>
+
+<pre><code>make up            # kind cluster + images + operator
+make experiments   # exp0..exp3, writes results/*.json
+make figures       # regenerate the SVGs from results</code></pre>
+
+        <p>Every number in the post is injected from <code>results/*.json</code> by a render script. Re-run the experiments and the post updates itself. MIT licensed.</p>
+
+        <div class="post-foot">
+            <a class="tlink" href="https://github.com/Advaith789/vllm-k8s-operator" target="_blank" rel="noopener">read the code on github <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+    </article>
+    </div>
+</main>
+
+<footer class="footer">
+    <div class="wrap">
+        <span class="eyebrow">get in touch</span>
+        <a class="footer-cta" href="mailto:advaith.srivastav@gmail.com">advaith.srivastav@gmail.com</a>
+        <div class="footer-bottom">
+            <span>madison, wi &middot; open to data &amp; ml engineering roles</span>
+            <div class="footer-links">
+                <a href="index.html">home</a>
+                <a href="https://www.linkedin.com/in/advaithchandrasrivastav/" target="_blank" rel="noopener">linkedin</a>
+                <a href="https://github.com/Advaith789" target="_blank" rel="noopener">github</a>
+                <a href="https://x.com/advaith____" target="_blank" rel="noopener">x</a>
+                <a href="https://www.instagram.com/advaith____" target="_blank" rel="noopener">instagram</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script src="index.js"></script>
+</body>
+</html>

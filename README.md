@@ -4,7 +4,8 @@ Personal portfolio — a static, dependency-free single page.
 
 ```
 index.html          the whole site: hero, index, experience (+ leadership),
-                    projects, publications, skills, education, contact
+                    education, projects, publications, skills, contact
+blogs.html          the blog — one post per project, newest first
 index.css           the design system (tokens at the top)
 index.js            nav state, mobile menu, scrollspy, scroll reveals — no libraries
 assets/             resume pdf, profile photo, mahita certificate
@@ -17,6 +18,11 @@ assets/projects/    generated cover art, one svg per project
 
 - No build step. Open `index.html`, or run `python3 -m http.server` and visit
   `localhost:8000`.
+- The portfolio is one page with anchored sections; the blog is the one
+  separate page, at /blogs.html.
+- To add a post: copy the `<header class="post-head">` + `<article class="post">`
+  pair in `blogs.html` and put the new one above the existing ones. Prose is held
+  to a 70ch measure; tables and `pre` blocks span the full column.
 - One page, six anchored sections. The nav underlines whichever section is in
   view (IntersectionObserver in `index.js`), and `[id] { scroll-margin-top }`
   keeps anchor jumps clear of the fixed nav.
