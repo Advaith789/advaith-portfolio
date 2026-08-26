@@ -65,10 +65,10 @@
                         <span class="no">note 002</span>
                         <span>august 2026</span>
                         <span>kubernetes &middot; vllm</span>
-                        <span>9 min read</span>
+                        <span>11 min read</span>
                     </div>
                     <h2>I wrote a Kubernetes operator because a job asked for one</h2>
-                    <p class="dek">A job wanted operator experience and hardware debugging. I had neither, so I built one for vLLM. Kubernetes kills healthy pods, the port lies about being ready, and one pod flatly refused to die.</p>
+                    <p class="dek">A job wanted operator experience and hardware debugging. I had neither, so I built one for vLLM. The same config caused two opposite disasters, 503 requests went to an engine with no memory, and the pod that ignored its own death notice served more traffic than the healthy one.</p>
                     <span class="read">read post <svg class="arw" width="14" height="12" viewBox="0 0 18 14" fill="none" aria-hidden="true"><path d="M2 7h13M11 2l5 5-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 </div>
             </a>

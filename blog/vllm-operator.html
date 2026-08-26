@@ -57,7 +57,7 @@
             <span>note 002</span><span class="sep">/</span>
             <span>august 2026</span><span class="sep">/</span>
             <span>kubernetes &middot; vllm</span><span class="sep">/</span>
-            <span>9 min read</span>
+            <span>11 min read</span>
         </div>
         <h1 class="post-title">I wrote a Kubernetes operator because a job asked for one</h1>
     </header>
@@ -65,76 +65,96 @@
     <article class="post reveal">
         <p>A job I wanted asked for two things I did not have on paper: Kubernetes operator experience, and experience debugging hardware. So I built the thing instead of reading about it. A small operator for vLLM. You give it a model, a tensor parallel size and a slice of GPU memory, and it turns that into serving pods that actually work.</p>
 
-        <p>The happy path took an afternoon. The other three weeks went into the parts nobody blogs about, which is of course where all the fun was.</p>
+        <p>The happy path took an afternoon. The rest of the time went into the parts nobody blogs about, and into finding five bugs in my own code, which is where all the fun turned out to be.</p>
 
         <div class="note">
             <span class="label">one honest caveat</span>
-            <p>I do not own a GPU. The Kubernetes half of this is completely real: a real three node cluster, the real scheduler, real kubelet probes, a real operator process. The engine is a simulator that copies vLLM's startup phases and its memory math. So the control loop behaviour is real and the speed numbers do not exist. I have not quoted a single tokens per second figure anywhere, on purpose.</p>
+            <p>I do not own a GPU. The Kubernetes half of this is completely real: a real three node cluster, the real scheduler, real kubelet probes, a real operator process. The engine is a simulator that copies vLLM's startup phases and its memory math. So the control loop behaviour is real and the speed numbers do not exist. I have not quoted a single tokens per second figure anywhere, on purpose, and the repo lists claim by claim what you can trust.</p>
         </div>
 
         <figure>
             <img src="../assets/blog/reconcile-loop.svg" alt="The reconcile loop: admit the spec, observe, gate readiness, check GPU health, roll out" loading="lazy">
-            <figcaption>the whole loop on one page. every arrow below is one of these boxes.</figcaption>
+            <figcaption>the whole loop on one page. everything below is one of these boxes.</figcaption>
         </figure>
 
-        <h2><span class="n">01</span>Kubernetes kills healthy pods, and it thinks it is helping</h2>
+        <h2><span class="n">01</span>The same config, two opposite disasters</h2>
 
         <p>Here is the fact that breaks everything. vLLM loads the model weights, then builds its KV cache, and only then can it answer a request. For an 8B model that is about 115 seconds of doing nothing useful.</p>
 
-        <p>Kubernetes, out of the box, gives a pod 30 seconds to prove it is alive. So the kubelet waits 30 seconds, decides the pod is sick, and kills it. The pod restarts. It gets killed again. You get CrashLoopBackOff forever, on a pod whose only crime was being asked to load a big model.</p>
+        <p>Kubernetes, out of the box, gives a pod 30 seconds to prove it is alive. So the kubelet waits 30 seconds, decides the pod is sick, and kills it. The pod restarts. It gets killed again. In my test that arm restarted five times and served nothing at all. Its only crime was being asked to load a big model.</p>
 
-        <p>Then there is the opposite problem, and it is worse because it is quiet. Run vLLM behind a proxy and the port answers immediately, long before the engine is ready. Kubernetes checks the port, sees an answer, and starts routing real traffic to a pod that has no memory to serve it with.</p>
+        <p>Now run the exact same YAML behind a proxy, which is how most people actually deploy this. The port answers straight away. Kubernetes sees an answer, decides the pod is ready, and starts sending it real traffic 12.5 seconds in. The engine will not be ready for another 105. That is 92 seconds of a Service confidently handing requests to a pod with nothing to serve them with. 454 of them.</p>
 
-        <p>So the probe can be too strict or too loose, and both are bad, and they pull in opposite directions.</p>
+        <p>Nothing in the config changed. What changed was when the port opened.</p>
+
+        <p>The worst cell in the whole experiment is the probe most people reach for first. A plain port check, behind a proxy, joins the Service at <strong>3.1 seconds</strong> against an engine that is not ready until <strong>105.5</strong>. That is 503 requests into a void. Checking a health endpoint is barely better at 493, because "the web server is up" and "the model has memory" are different questions and only one of them is being asked.</p>
 
         <figure>
-            <img src="../assets/blog/probe-window.svg" alt="Timeline showing when Kubernetes marks a pod ready versus when vLLM can actually serve" loading="lazy">
-            <figcaption>red is the window where kubernetes says "ready" and the engine says nothing.</figcaption>
+            <img src="../assets/blog/probe-window.svg" alt="Nine probe setups on a timeline, showing how long each one sends traffic to an engine that cannot answer" loading="lazy">
+            <figcaption>red is the window where kubernetes says "ready" and the engine says nothing. same configs, two topologies.</figcaption>
         </figure>
 
-        <p>The fix that works is boring and I like it a lot. A startup probe with a generous budget absorbs the weight load, because Kubernetes promises not to arm the liveness probe until startup succeeds. Then the operator, not the kubelet, casts the final vote through a pod readiness gate. The operator checks the pod's own metrics for a KV cache, and only then lets it into the Service.</p>
+        <p>So the answer is not "use a better probe". The answer is that you cannot pick the probe at all until you know how the port gets exposed, and most people running vLLM behind a gateway have never thought about that link.</p>
+
+        <p>The thing that survives both columns is boring and I like it a lot. A startup probe with a generous budget absorbs the weight load, because Kubernetes promises not to arm the liveness check until startup finishes. Then the operator, not the kubelet, casts the final vote through a pod readiness gate. It checks the pod's own metrics for a KV cache, and only then lets it into the Service. Misrouted requests: zero, in both topologies.</p>
+
+        <p>It is not free. My gate lets the pod in at 119 seconds when the cache actually existed at 105, so it costs about 14 seconds of extra waiting, because the operator polls instead of watching. For something that takes two minutes to boot that is an easy trade, but it is still a trade and I would rather say so.</p>
 
         <p>The kubelet knows if a process is running. It cannot know if a language model has memory to think with. So do not ask it.</p>
 
-        <h2><span class="n">02</span>Two things I got wrong (both funnier than the fix)</h2>
+        <h2><span class="n">02</span>Two bugs in my own simulator, both worth keeping</h2>
 
         <h3>The port was open the entire time</h3>
 
-        <p>My first results made no sense. A TCP check was passing instantly in a setup where the port was supposed to be shut. Turns out Python's <code>ThreadingHTTPServer</code> opens and starts listening the moment you build it. I was only delaying the part that answers. So the socket was politely accepting connections into a queue for two minutes while nobody was home.</p>
+        <p>My first results made no sense. A port check was passing instantly in a setup where the port was supposed to be shut. Turns out Python's <code>ThreadingHTTPServer</code> starts listening the moment you build it. I was only delaying the part that answers. So the socket was politely accepting connections into a queue for two minutes while nobody was home.</p>
 
-        <p>My simulator bug is also a real deployment bug, which is the best kind of bug. A TCP check against a socket that listens but never answers passes happily. That is one more reason a port check is the wrong question for this workload.</p>
+        <p>My simulator bug is also a real deployment bug, which is the best kind. A port check against a socket that listens but never answers passes happily.</p>
 
         <h3>The pod that refused to die</h3>
 
-        <p>One arm of the test was supposed to crash loop. It did not. The pod was killed at about 32 seconds and stayed alive until about 152. In between it finished loading, served traffic for thirty seconds, and then vanished in the middle of a request.</p>
+        <p>One arm was supposed to crash loop. It did not. The pod was killed at about 32 seconds and stayed alive until about 152. In between it finished loading, served traffic for thirty seconds, and then vanished in the middle of a request.</p>
 
-        <p>The reason is a very old Linux rule. Process number 1 gets no default signal handling. So a Python process running as PID 1 with no SIGTERM handler simply ignores the polite request to shut down, and every kill has to wait out the full grace period. With a handler it stops in one second. Without one it takes the entire timeout.</p>
+        <p>The reason is a very old Linux rule. Process number 1 gets no default signal handling, so a Python process running as PID 1 with no shutdown handler simply ignores the polite request to stop. Every kill then has to wait out the full grace period. With a handler it stops in one second. Without one it takes the entire timeout.</p>
 
-        <p>This bites vLLM harder than most things, because vLLM wants a long grace period so it can finish the requests it is already answering. The better you make the good case, the longer a doomed pod hangs around.</p>
+        <p>Here is my favourite number in the whole project. That broken arm served <strong>19%</strong> of requests, while the correctly behaved version served <strong>0%</strong>. The broken one looks better. It was not healthier. It had already been sentenced to death and it took two minutes to die, so it spent them working.</p>
 
         <h2><span class="n">03</span>The rollout that can never finish</h2>
 
-        <p>A normal Kubernetes rolling update assumes pods are cheap and swappable. Start the new one, then stop the old one. A vLLM pod is neither cheap nor swappable. It takes minutes to become useful, and it is holding the GPU that its own replacement needs.</p>
+        <p>A normal rolling update assumes pods are cheap and swappable. Start the new one, then stop the old one. A vLLM pod is neither. It takes minutes to become useful, and it is holding the GPU that its own replacement needs.</p>
 
-        <p>With one GPU, the new pod waits for a device the old pod will not release until the new pod is ready. Nothing crashes. The rollout just sits there, forever, which is a much more annoying failure than a crash.</p>
+        <p>With one GPU, a standard rolling update simply never completes. Not a crash, not an error. It just sits there while the new pod waits for a device the old pod will not let go of, which is a far more annoying failure than crashing.</p>
 
-        <p>So the operator looks at the real free capacity and picks. If a GPU is free it builds the new pod first and retires the old one after, and nobody notices. If nothing is free it drains first: pull the pod out of rotation, wait for the requests in flight to finish, then delete it and build the replacement. That still has downtime. Nothing can remove it. But the rollout finishes and no request gets cut in half.</p>
+        <p>So the operator looks at the real free capacity and picks. With a spare GPU it builds the new pod first and retires the old one after: 4 seconds of downtime, nobody notices. With no spare it drains first, which means pulling the pod out of rotation, waiting for the requests in flight to finish, and only then deleting it. That still costs about two minutes of downtime, because the replacement cannot start until the GPU is free. Nothing can fix that.</p>
 
-        <p>I shipped a bug here and then found it myself, which felt great for about four seconds. My first idea of "a free GPU" was capacity minus what is used. That is the obvious definition and it is wrong. A node can look Ready and still refuse the pod because it is cordoned, or unreachable, or carrying a taint. Counting those as free made the operator confidently pick the strategy that deadlocks, which is exactly the failure it exists to prevent.</p>
+        <p>Here is the part I got wrong, and it is a nice reminder that a measurement can lie by being too easy. My first test used short requests that finish in about 47 milliseconds. At that speed there is never anything in flight, so every strategy cut off exactly zero requests, including the one that does no draining at all. I had written a claim my own experiment could not test.</p>
+
+        <p>Re-run it with long answers, the kind real traffic actually has, and the difference appears: a plain recreate cuts off <strong>12</strong> answers mid sentence, draining first cuts off <strong>none</strong>, and that costs about eight extra seconds of downtime. If your requests are short, this buys you nothing and you should not bother.</p>
+
+        <p>There is also a bug here I shipped and then found, which felt great for about four seconds. My first idea of "a free GPU" was capacity minus what is used. That is the obvious definition and it is wrong. A node can look Ready and still refuse the pod because it is cordoned, or unreachable, or carrying a taint. Counting those as free made the operator confidently pick the strategy that deadlocks, which is exactly the failure it exists to prevent.</p>
 
         <h2><span class="n">04</span>Kubernetes has no idea your GPU is broken</h2>
 
-        <p>This is the part I most wanted to answer, and the answer is a little bleak. The device plugin reports one GPU because the device shows up on the bus, not because it works. A card can be throwing uncorrectable memory errors and Kubernetes will keep cheerfully scheduling pods onto it, and those pods will keep dying, and nothing anywhere in the API will say why.</p>
+        <p>This is the part I most wanted to answer, and the answer is a little bleak. The device plugin reports one GPU because the card shows up, not because it works. It can be throwing uncorrectable memory errors and falling off the bus, and Kubernetes will keep cheerfully scheduling pods onto it, and those pods will keep dying, and nothing anywhere in the API will say why. In my baseline run that is exactly what happens: the pod restarts on the same dead card forever.</p>
 
-        <p>So a small agent reads the kernel log for NVIDIA Xid errors and turns the serious ones into a node condition and a taint. The operator sees that, moves its pods, and stops using the node.</p>
+        <p>So a small agent reads the kernel log for NVIDIA error codes and turns the serious ones into a taint. The operator sees it, moves its pods, and stops using the node. It spots a dead GPU in <strong>0.09 seconds</strong> and has the workload serving on a healthy node about <strong>50 seconds</strong> later.</p>
 
-        <p>The interesting bit is not the plumbing, it is the judgement. Xid 13 and Xid 31 are the most common errors you will see, and they usually mean the workload did something silly, not that the card is dying. An agent that panics on every error would drain healthy machines because one user sent a bad request. Being too relaxed costs you one pod restart. Being too aggressive costs you a whole node. So anything it does not recognise, it leaves alone and says so out loud.</p>
+        <p>The interesting bit is not the plumbing, it is the judgement. The two most common error codes usually mean the workload did something silly, not that the card is dying. An agent that panics on those would drain healthy machines because one user sent a bad request. So it leaves them alone, on purpose, and the pod just restarts once, which is correct. Being too relaxed costs you a restart. Being too aggressive costs you a node.</p>
+
+        <h3>The bug that took me longest to find</h3>
+
+        <p>One scenario failed three times and I misdiagnosed it twice. The agent's own log had the answer sitting there the whole time. First run: saw the error, quarantined the node. Second run: saw the same error, classified it correctly, and then did nothing at all.</p>
+
+        <p>The reason is one line. My cordon function started with "if I have already cordoned, stop". That flag lived in the agent's memory. Something had cleared the taint in between, and the agent never noticed, because it was asking itself instead of asking the cluster.</p>
+
+        <p>That is a silent, permanent false negative on the exact thing the component exists to catch. In real life it looks like this: an engineer uncordons a node to get capacity back, the card is still broken, and the one process that could say so has already decided it did.</p>
+
+        <p>The fix is to read the real state every time. And the lesson is the one thing I would keep from this whole build: <strong>latch the decision, never the observation.</strong> A controller is allowed to remember what it chose to do. It is never allowed to remember what the world looked like, because the world changes underneath it and nothing will send you a note.</p>
 
         <h2><span class="n">05</span>The part I did not plan, and my favourite one</h2>
 
         <p>Everything vLLM figures out during startup, whether the KV cache will fit, is just arithmetic. Model shape, memory fraction, sequence limits. None of it needs a GPU. So the operator does the same math up front and refuses to create a pod it can prove will fail.</p>
 
-        <p>Same verdict, roughly one hundred million times faster, and you get it as a message instead of a crash loop.</p>
+        <p>It agreed with the engine on all 24 configurations I tested, exactly, and it takes about a microsecond instead of the two to four minutes the engine needs to reach the same conclusion by trying. Same verdict, told to you as a message instead of a crash loop.</p>
 
         <p>It also showed me something I did not expect. There is a window of memory settings that boots. Too low and there is nothing left for the cache. Too high and there is nothing left for the graph capture at the end. And raising your batch limit squeezes that window from both sides at once.</p>
 
@@ -148,19 +168,21 @@
         <div class="numbers">
             <span class="label">the numbers, in one place</span>
             <dl>
-                <div><dt>115s vs 30s</dt><dd>time an 8B model needs to load, against the default budget Kubernetes gives it</dd></div>
-                <div><dt>1.24&micro;s</dt><dd>to predict the KV cache result, against 102.7 to 270.1 seconds for the engine to find out</dd></div>
+                <div><dt>503</dt><dd>requests sent to an engine with no memory, by the probe most people reach for first</dd></div>
+                <div><dt>0</dt><dd>misrouted once the operator holds the vote instead of the kubelet</dd></div>
+                <div><dt>12 vs 0</dt><dd>long answers cut off mid sentence, plain recreate against draining first</dd></div>
+                <div><dt>0.09s</dt><dd>to spot a dead GPU, and about 50 seconds back to serving on a healthy node</dd></div>
                 <div><dt>24 / 24</dt><dd>configurations where the prediction matched the engine exactly</dd></div>
-                <div><dt>1s vs the full timeout</dt><dd>time to stop a pod, with and without a signal handler</dd></div>
+                <div><dt>1.24&micro;s</dt><dd>to answer "will this fit", against 102.7 to 270.1 seconds of finding out the hard way</dd></div>
             </dl>
-            <p class="foot">Every table, every arm, the method and the raw JSON live in the README, and the post there regenerates itself from the results files. <a class="tlink" href="https://github.com/Advaith789/vllm-k8s-operator" target="_blank" rel="noopener">read the full write up <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+            <p class="foot">All nine probe setups, both rollout experiments, the full error code table and the raw JSON are in the README, and it regenerates itself from the results files. There is also a caveats page saying claim by claim what is measured and what is estimated. <a class="tlink" href="https://github.com/Advaith789/vllm-k8s-operator" target="_blank" rel="noopener">read the full write up <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
         </div>
 
         <h2><span class="n">06</span>What I would do next</h2>
 
         <ul class="bullets">
             <li>Calibrate the predictor on a real card. The structure is right, the constants are educated guesses.</li>
-            <li>Give a quarantined node a way back. Right now it stays out until something clears the flag by hand.</li>
+            <li>Give a quarantined node a way back, with enough patience that a flaky card does not flip in and out.</li>
             <li>Warm the replacement before releasing the GPU, which should eat into the only downtime that is left.</li>
             <li>Handle models too big for one machine. Every decision above gets harder when a replica is a group of pods that live and die together.</li>
             <li>Run more than one operator without the two of them fighting.</li>
