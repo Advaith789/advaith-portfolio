@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Everyone hands the model a database. I built the part that says no — Advaith Chandra Srivastav</title>
+    <meta name="description" content="A safety layer between an AI agent and a SQL warehouse, and the one query that proved checking the top of the tree is not enough.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff4b2b'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../index.css">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC5VYM7ZC9"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-BC5VYM7ZC9');
+    </script>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a class="brand" href="../index.html" aria-label="home">advaith chandra</a>
+        <div class="nav-links">
+            <a href="../index.html#experience">experience</a>
+            <a href="../index.html#education">education</a>
+            <a href="../index.html#projects">projects</a>
+            <a href="../index.html#publications">publications</a>
+            <a href="../index.html#skills">skills</a>
+            <a href="../blogs.html" aria-current="page">blog</a>
+            <a href="../index.html#contact">contact</a>
+        </div>
+        <button class="nav-toggle" aria-expanded="false" aria-label="open menu" aria-controls="menu">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</nav>
+
+<div class="menu" id="menu">
+    <a href="../index.html#experience">experience</a>
+    <a href="../index.html#education">education</a>
+    <a href="../index.html#projects">projects</a>
+    <a href="../index.html#publications">publications</a>
+    <a href="../index.html#skills">skills</a>
+    <a href="../blogs.html">blog</a>
+    <a href="../index.html#contact">contact</a>
+</div>
+
+<main>
+    <div class="wrap">
+    <header class="post-head reveal">
+        <a class="back" href="../blogs.html"><svg class="arw" width="14" height="12" viewBox="0 0 18 14" fill="none" aria-hidden="true"><path d="M16 7H3M7 2L2 7l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> all posts</a>
+        <div class="post-meta">
+            <span>note 001</span><span class="sep">/</span>
+            <span>august 2026</span><span class="sep">/</span>
+            <span>agents &middot; sql</span><span class="sep">/</span>
+            <span>6 min read</span>
+        </div>
+        <h1 class="post-title">Everyone hands the model a database. I built the part that says no</h1>
+    </header>
+
+    <article class="post reveal">
+        <p>Everyone is busy giving language models access to the company database. Almost every tool that does it works the same way: the model writes some SQL, the server runs it, the rows come back. Connecting to a warehouse is the easy part. It has been easy for forty years.</p>
+
+        <p>The hard part is everything wrapped around that. Can you prove this query only reads? Do you know what it costs before you pay for it? Whose permissions is it running as? And when someone asks next month why the payments table got scanned at three in the morning, can you answer?</p>
+
+        <p>I wanted to see if I could build that missing layer. It sits between the model and the warehouse and it is allowed to say no.</p>
+
+        <h2><span class="n">01</span>The query that taught me the whole problem</h2>
+
+        <p>Start with the simplest guard anyone writes: does the query start with SELECT? It is one line and it feels reasonable. It is also wrong often enough to be dangerous.</p>
+
+        <p>So you get smarter. You parse the SQL properly and look at what kind of statement it is at the top. This feels like the grown up solution. Then you meet this:</p>
+
+<pre><code>WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d</code></pre>
+
+        <p>That is a SELECT. The parser agrees it is a SELECT. The top of the tree says SELECT. It also empties your orders table.</p>
+
+        <p>There are more like it. One quietly copies a table somewhere else. One takes locks on rows it was only supposed to read. All of them look like reads at the top and are not reads underneath.</p>
+
+        <p>That is the whole lesson: you cannot check the top of the tree. You have to walk all of it, every branch, and know what each thing means. And when you meet something the parser does not understand, you refuse it, because unknown is not the same as safe.</p>
+
+        <h2><span class="n">02</span>Cheap to read is not the same as cheap to run</h2>
+
+        <p>The next thing I built was a cost limit, because agents are enthusiastic and warehouses charge by the byte. On BigQuery you can ask what a query will cost without running it, which is free and exact, so the server checks that first and refuses anything over the ceiling. It also keeps a running total for the session, because the way an agent burns money is not one huge query. It is the same medium query two hundred times.</p>
+
+        <p>Then a query slipped through that passed every byte check. It reads fifteen megabytes. It joins a table to itself in a way that matches everything to everything, and it produces fourteen billion rows.</p>
+
+        <p>Bytes read tells you how much you looked at. It says nothing about how much work you are about to do. So there are two limits now.</p>
+
+        <h2><span class="n">03</span>The model does not get to say who it is</h2>
+
+        <p>This one is short and I feel strongly about it. No tool takes a user name as an input. Not one. There is even a test that fails if anyone ever adds one.</p>
+
+        <p>An agent that can tell you who it is has told you nothing. Identity comes from configuration, from outside the conversation, always.</p>
+
+        <p>Row level rules get pushed into the query itself, into the tree, so each protected table is quietly replaced with a filtered version of itself. Gluing a WHERE clause onto the end would have been easier and it would have lasted right up until the first query that ended in OR 1=1.</p>
+
+        <h2><span class="n">04</span>Say no in a way the model can use</h2>
+
+        <p>A refusal that just says "denied" is a dead end. The agent tries again, slightly differently, forever.</p>
+
+        <p>So every refusal comes back with the reason, the limit it crossed, by how much, and a suggestion built from the query itself. Results come back capped, and when they are cut short the answer says so out loud instead of pretending that was all the data. To get more you use a cursor the server hands you, which the model cannot forge. It can ask for more of that. It never gets to quietly change what "that" was.</p>
+
+        <p>My favourite tool is the free one. It checks a query and prices it without running it. Given a free way to ask "would this be allowed and what would it cost", the model actually uses it, and its expensive mistakes turn into cheap refusals it can learn from. Without it, the only way to find out a query was too expensive is to be billed for it.</p>
+
+        <p>Last piece: everything gets written down, including the refusals, and every call has to say why it is being made. A warehouse log tells you a service account read four terabytes. This tells you an agent read them because it was chasing a refund that did not add up. Only one of those is worth anything to the person reading it later.</p>
+
+        <div class="numbers">
+            <span class="label">the numbers, in one place</span>
+            <dl>
+                <div><dt>0 of 46</dt><dd>attacks that got through the full tree walk</dd></div>
+                <div><dt>0 of 30</dt><dd>real analytics queries wrongly blocked</dd></div>
+                <div><dt>0.11ms</dt><dd>to check a query, which is nothing next to running one</dd></div>
+                <div><dt>5 tools</dt><dd>not forty, because a tool per table eats the context window</dd></div>
+            </dl>
+            <p class="foot">For contrast, on the same 76 query set: a prefix check misses 17 of the attacks, a keyword blocklist misses 12 and also blocks 5 real queries, and parsing properly but only checking the top of the tree still misses 12. The full comparison, the corpus and the method are in the README. <a class="tlink" href="https://github.com/Advaith789/ast-level-sql-mcp" target="_blank" rel="noopener">read the full write up <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+        </div>
+
+        <h2><span class="n">05</span>What I took away</h2>
+
+        <p>The interesting result was not that my version scored well. It was that the sensible looking approach, the one most people would ship, still misses a quarter of the attacks. Parsing the query is not the same as understanding it.</p>
+
+        <p>And a guard is only useful if it almost never blocks real work. A tool that cries wolf gets switched off in a week, and then you have no guard at all.</p>
+
+        <div class="post-foot">
+            <a class="tlink" href="https://github.com/Advaith789/ast-level-sql-mcp" target="_blank" rel="noopener">read the code on github <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+    </article>
+    </div>
+</main>
+
+<footer class="footer">
+    <div class="wrap">
+        <span class="eyebrow">get in touch</span>
+        <a class="footer-cta" href="mailto:advaith.srivastav@gmail.com">advaith.srivastav@gmail.com</a>
+        <div class="footer-bottom">
+            <span>madison, wi &middot; open to data &amp; ml engineering roles</span>
+            <div class="footer-links">
+                <a href="../index.html">home</a>
+                <a href="https://www.linkedin.com/in/advaithchandrasrivastav/" target="_blank" rel="noopener">linkedin</a>
+                <a href="https://github.com/Advaith789" target="_blank" rel="noopener">github</a>
+                <a href="https://x.com/advaith____" target="_blank" rel="noopener">x</a>
+                <a href="https://www.instagram.com/advaith____" target="_blank" rel="noopener">instagram</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script src="../index.js"></script>
+</body>
+</html>

@@ -5,7 +5,8 @@ Personal portfolio — a static, dependency-free single page.
 ```
 index.html          the whole site: hero, index, experience (+ leadership),
                     education, projects, publications, skills, contact
-blogs.html          the blog — one post per project, newest first
+blogs.html          the blog index, newest note first
+blog/*.html         one page per post
 index.css           the design system (tokens at the top)
 index.js            nav state, mobile menu, scrollspy, scroll reveals — no libraries
 assets/             resume pdf, profile photo, mahita certificate
@@ -20,9 +21,12 @@ assets/projects/    generated cover art, one svg per project
   `localhost:8000`.
 - The portfolio is one page with anchored sections; the blog is the one
   separate page, at /blogs.html.
-- To add a post: copy the `<header class="post-head">` + `<article class="post">`
-  pair in `blogs.html` and put the new one above the existing ones. Prose is held
-  to a 70ch measure; tables and `pre` blocks span the full column.
+- To add a post: copy an existing file in `blog/`, then add a `.post-card` to the
+  list in `blogs.html` with the next note number. Posts use `../` for assets.
+- The posts are the story; the tables and raw numbers stay in each project's
+  GitHub README. Each post carries exactly one `.numbers` block and links out for
+  the rest. Prose is held to a 70ch measure; figures span the full column.
+- Figures pulled from a project repo live in `assets/blog/`.
 - One page, six anchored sections. The nav underlines whichever section is in
   view (IntersectionObserver in `index.js`), and `[id] { scroll-margin-top }`
   keeps anchor jumps clear of the fixed nav.

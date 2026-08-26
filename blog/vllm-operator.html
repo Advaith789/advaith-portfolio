@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>I wrote a Kubernetes operator because a job asked for one — Advaith Chandra Srivastav</title>
+    <meta name="description" content="Why I built a vLLM operator, what broke while I built it, and the two bugs that were funnier than the fixes.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff4b2b'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../index.css">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC5VYM7ZC9"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-BC5VYM7ZC9');
+    </script>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a class="brand" href="../index.html" aria-label="home">advaith chandra</a>
+        <div class="nav-links">
+            <a href="../index.html#experience">experience</a>
+            <a href="../index.html#education">education</a>
+            <a href="../index.html#projects">projects</a>
+            <a href="../index.html#publications">publications</a>
+            <a href="../index.html#skills">skills</a>
+            <a href="../blogs.html" aria-current="page">blog</a>
+            <a href="../index.html#contact">contact</a>
+        </div>
+        <button class="nav-toggle" aria-expanded="false" aria-label="open menu" aria-controls="menu">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</nav>
+
+<div class="menu" id="menu">
+    <a href="../index.html#experience">experience</a>
+    <a href="../index.html#education">education</a>
+    <a href="../index.html#projects">projects</a>
+    <a href="../index.html#publications">publications</a>
+    <a href="../index.html#skills">skills</a>
+    <a href="../blogs.html">blog</a>
+    <a href="../index.html#contact">contact</a>
+</div>
+
+<main>
+    <div class="wrap">
+    <header class="post-head reveal">
+        <a class="back" href="../blogs.html"><svg class="arw" width="14" height="12" viewBox="0 0 18 14" fill="none" aria-hidden="true"><path d="M16 7H3M7 2L2 7l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> all posts</a>
+        <div class="post-meta">
+            <span>note 002</span><span class="sep">/</span>
+            <span>august 2026</span><span class="sep">/</span>
+            <span>kubernetes &middot; vllm</span><span class="sep">/</span>
+            <span>9 min read</span>
+        </div>
+        <h1 class="post-title">I wrote a Kubernetes operator because a job asked for one</h1>
+    </header>
+
+    <article class="post reveal">
+        <p>A job I wanted asked for two things I did not have on paper: Kubernetes operator experience, and experience debugging hardware. So I built the thing instead of reading about it. A small operator for vLLM. You give it a model, a tensor parallel size and a slice of GPU memory, and it turns that into serving pods that actually work.</p>
+
+        <p>The happy path took an afternoon. The other three weeks went into the parts nobody blogs about, which is of course where all the fun was.</p>
+
+        <div class="note">
+            <span class="label">one honest caveat</span>
+            <p>I do not own a GPU. The Kubernetes half of this is completely real: a real three node cluster, the real scheduler, real kubelet probes, a real operator process. The engine is a simulator that copies vLLM's startup phases and its memory math. So the control loop behaviour is real and the speed numbers do not exist. I have not quoted a single tokens per second figure anywhere, on purpose.</p>
+        </div>
+
+        <figure>
+            <img src="../assets/blog/reconcile-loop.svg" alt="The reconcile loop: admit the spec, observe, gate readiness, check GPU health, roll out" loading="lazy">
+            <figcaption>the whole loop on one page. every arrow below is one of these boxes.</figcaption>
+        </figure>
+
+        <h2><span class="n">01</span>Kubernetes kills healthy pods, and it thinks it is helping</h2>
+
+        <p>Here is the fact that breaks everything. vLLM loads the model weights, then builds its KV cache, and only then can it answer a request. For an 8B model that is about 115 seconds of doing nothing useful.</p>
+
+        <p>Kubernetes, out of the box, gives a pod 30 seconds to prove it is alive. So the kubelet waits 30 seconds, decides the pod is sick, and kills it. The pod restarts. It gets killed again. You get CrashLoopBackOff forever, on a pod whose only crime was being asked to load a big model.</p>
+
+        <p>Then there is the opposite problem, and it is worse because it is quiet. Run vLLM behind a proxy and the port answers immediately, long before the engine is ready. Kubernetes checks the port, sees an answer, and starts routing real traffic to a pod that has no memory to serve it with.</p>
+
+        <p>So the probe can be too strict or too loose, and both are bad, and they pull in opposite directions.</p>
+
+        <figure>
+            <img src="../assets/blog/probe-window.svg" alt="Timeline showing when Kubernetes marks a pod ready versus when vLLM can actually serve" loading="lazy">
+            <figcaption>red is the window where kubernetes says "ready" and the engine says nothing.</figcaption>
+        </figure>
+
+        <p>The fix that works is boring and I like it a lot. A startup probe with a generous budget absorbs the weight load, because Kubernetes promises not to arm the liveness probe until startup succeeds. Then the operator, not the kubelet, casts the final vote through a pod readiness gate. The operator checks the pod's own metrics for a KV cache, and only then lets it into the Service.</p>
+
+        <p>The kubelet knows if a process is running. It cannot know if a language model has memory to think with. So do not ask it.</p>
+
+        <h2><span class="n">02</span>Two things I got wrong (both funnier than the fix)</h2>
+
+        <h3>The port was open the entire time</h3>
+
+        <p>My first results made no sense. A TCP check was passing instantly in a setup where the port was supposed to be shut. Turns out Python's <code>ThreadingHTTPServer</code> opens and starts listening the moment you build it. I was only delaying the part that answers. So the socket was politely accepting connections into a queue for two minutes while nobody was home.</p>
+
+        <p>My simulator bug is also a real deployment bug, which is the best kind of bug. A TCP check against a socket that listens but never answers passes happily. That is one more reason a port check is the wrong question for this workload.</p>
+
+        <h3>The pod that refused to die</h3>
+
+        <p>One arm of the test was supposed to crash loop. It did not. The pod was killed at about 32 seconds and stayed alive until about 152. In between it finished loading, served traffic for thirty seconds, and then vanished in the middle of a request.</p>
+
+        <p>The reason is a very old Linux rule. Process number 1 gets no default signal handling. So a Python process running as PID 1 with no SIGTERM handler simply ignores the polite request to shut down, and every kill has to wait out the full grace period. With a handler it stops in one second. Without one it takes the entire timeout.</p>
+
+        <p>This bites vLLM harder than most things, because vLLM wants a long grace period so it can finish the requests it is already answering. The better you make the good case, the longer a doomed pod hangs around.</p>
+
+        <h2><span class="n">03</span>The rollout that can never finish</h2>
+
+        <p>A normal Kubernetes rolling update assumes pods are cheap and swappable. Start the new one, then stop the old one. A vLLM pod is neither cheap nor swappable. It takes minutes to become useful, and it is holding the GPU that its own replacement needs.</p>
+
+        <p>With one GPU, the new pod waits for a device the old pod will not release until the new pod is ready. Nothing crashes. The rollout just sits there, forever, which is a much more annoying failure than a crash.</p>
+
+        <p>So the operator looks at the real free capacity and picks. If a GPU is free it builds the new pod first and retires the old one after, and nobody notices. If nothing is free it drains first: pull the pod out of rotation, wait for the requests in flight to finish, then delete it and build the replacement. That still has downtime. Nothing can remove it. But the rollout finishes and no request gets cut in half.</p>
+
+        <p>I shipped a bug here and then found it myself, which felt great for about four seconds. My first idea of "a free GPU" was capacity minus what is used. That is the obvious definition and it is wrong. A node can look Ready and still refuse the pod because it is cordoned, or unreachable, or carrying a taint. Counting those as free made the operator confidently pick the strategy that deadlocks, which is exactly the failure it exists to prevent.</p>
+
+        <h2><span class="n">04</span>Kubernetes has no idea your GPU is broken</h2>
+
+        <p>This is the part I most wanted to answer, and the answer is a little bleak. The device plugin reports one GPU because the device shows up on the bus, not because it works. A card can be throwing uncorrectable memory errors and Kubernetes will keep cheerfully scheduling pods onto it, and those pods will keep dying, and nothing anywhere in the API will say why.</p>
+
+        <p>So a small agent reads the kernel log for NVIDIA Xid errors and turns the serious ones into a node condition and a taint. The operator sees that, moves its pods, and stops using the node.</p>
+
+        <p>The interesting bit is not the plumbing, it is the judgement. Xid 13 and Xid 31 are the most common errors you will see, and they usually mean the workload did something silly, not that the card is dying. An agent that panics on every error would drain healthy machines because one user sent a bad request. Being too relaxed costs you one pod restart. Being too aggressive costs you a whole node. So anything it does not recognise, it leaves alone and says so out loud.</p>
+
+        <h2><span class="n">05</span>The part I did not plan, and my favourite one</h2>
+
+        <p>Everything vLLM figures out during startup, whether the KV cache will fit, is just arithmetic. Model shape, memory fraction, sequence limits. None of it needs a GPU. So the operator does the same math up front and refuses to create a pod it can prove will fail.</p>
+
+        <p>Same verdict, roughly one hundred million times faster, and you get it as a message instead of a crash loop.</p>
+
+        <p>It also showed me something I did not expect. There is a window of memory settings that boots. Too low and there is nothing left for the cache. Too high and there is nothing left for the graph capture at the end. And raising your batch limit squeezes that window from both sides at once.</p>
+
+        <figure>
+            <img src="../assets/blog/config-surface.svg" alt="The range of gpu memory settings that boot, narrowing as the batch limit rises" loading="lazy">
+            <figcaption>the safe range gets thinner from both ends as you ask for more concurrency.</figcaption>
+        </figure>
+
+        <p>The top edge is the mean one, because it fails late. After the weights load. After the port opens. After a naive probe has already told everyone the pod is fine. So the operator now just tells you the range that works.</p>
+
+        <div class="numbers">
+            <span class="label">the numbers, in one place</span>
+            <dl>
+                <div><dt>115s vs 30s</dt><dd>time an 8B model needs to load, against the default budget Kubernetes gives it</dd></div>
+                <div><dt>1.24&micro;s</dt><dd>to predict the KV cache result, against 102.7 to 270.1 seconds for the engine to find out</dd></div>
+                <div><dt>24 / 24</dt><dd>configurations where the prediction matched the engine exactly</dd></div>
+                <div><dt>1s vs the full timeout</dt><dd>time to stop a pod, with and without a signal handler</dd></div>
+            </dl>
+            <p class="foot">Every table, every arm, the method and the raw JSON live in the README, and the post there regenerates itself from the results files. <a class="tlink" href="https://github.com/Advaith789/vllm-k8s-operator" target="_blank" rel="noopener">read the full write up <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+        </div>
+
+        <h2><span class="n">06</span>What I would do next</h2>
+
+        <ul class="bullets">
+            <li>Calibrate the predictor on a real card. The structure is right, the constants are educated guesses.</li>
+            <li>Give a quarantined node a way back. Right now it stays out until something clears the flag by hand.</li>
+            <li>Warm the replacement before releasing the GPU, which should eat into the only downtime that is left.</li>
+            <li>Handle models too big for one machine. Every decision above gets harder when a replica is a group of pods that live and die together.</li>
+            <li>Run more than one operator without the two of them fighting.</li>
+        </ul>
+
+        <p>If you want the real detail, the tables and the code are all in the repo. This was the fun version.</p>
+
+        <div class="post-foot">
+            <a class="tlink" href="https://github.com/Advaith789/vllm-k8s-operator" target="_blank" rel="noopener">read the code on github <svg class="arw" width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+    </article>
+    </div>
+</main>
+
+<footer class="footer">
+    <div class="wrap">
+        <span class="eyebrow">get in touch</span>
+        <a class="footer-cta" href="mailto:advaith.srivastav@gmail.com">advaith.srivastav@gmail.com</a>
+        <div class="footer-bottom">
+            <span>madison, wi &middot; open to data &amp; ml engineering roles</span>
+            <div class="footer-links">
+                <a href="../index.html">home</a>
+                <a href="https://www.linkedin.com/in/advaithchandrasrivastav/" target="_blank" rel="noopener">linkedin</a>
+                <a href="https://github.com/Advaith789" target="_blank" rel="noopener">github</a>
+                <a href="https://x.com/advaith____" target="_blank" rel="noopener">x</a>
+                <a href="https://www.instagram.com/advaith____" target="_blank" rel="noopener">instagram</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script src="../index.js"></script>
+</body>
+</html>

@@ -888,7 +888,10 @@ body.menu-open { overflow: hidden; }
     padding-bottom: clamp(28px, 4vw, 44px);
 }
 
-.post-head { padding-bottom: 4px; }
+.post-head {
+    padding-top: calc(var(--nav-h) + clamp(38px, 6vw, 76px));
+    padding-bottom: 4px;
+}
 
 .post-title {
     font-size: clamp(1.95rem, 4.1vw, 2.9rem);
@@ -1061,4 +1064,161 @@ tr.is-key td:first-child { font-weight: 500; }
     margin-top: clamp(44px, 6vw, 72px);
     padding-top: 26px;
     border-top: 1px solid var(--line);
+}
+
+/* ------------------------------------------------- blog index (blogs.html) */
+
+.post-list { border-top: 1px solid var(--line); }
+
+.post-card {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: clamp(20px, 3.5vw, 44px);
+    align-items: start;
+    padding-block: clamp(28px, 4vw, 42px);
+    border-bottom: 1px solid var(--line);
+    transition: background 0.35s var(--ease), padding-inline 0.35s var(--ease);
+}
+
+.post-card:hover { background: var(--bg-soft); padding-inline: 18px; }
+
+.post-card-media {
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-soft);
+}
+
+.post-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s var(--ease);
+}
+
+.post-card:hover .post-card-media img { transform: scale(1.04); }
+
+.post-card .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 12px;
+}
+
+.post-card .kicker .no { color: var(--accent); }
+
+.post-card h2 {
+    font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+    letter-spacing: -0.03em;
+    margin-bottom: 0.6rem;
+    max-width: 26ch;
+}
+
+.post-card .dek {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 58ch;
+    margin-bottom: 1rem;
+}
+
+.post-card .read {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.post-card .read .arw { transition: transform 0.3s var(--ease); }
+.post-card:hover .read .arw { transform: translateX(4px); }
+
+/* back to the index, above each post */
+.back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.6rem;
+    transition: color 0.25s var(--ease);
+}
+
+.back:hover { color: var(--ink); }
+.back .arw { transition: transform 0.3s var(--ease); }
+.back:hover .arw { transform: translateX(-3px); }
+
+/* the one place numbers live in a post */
+.numbers {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: clamp(20px, 3vw, 28px);
+    margin: 2.2rem 0;
+    background: var(--bg-soft);
+}
+
+.numbers .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 18px;
+}
+
+.numbers dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 22px 26px;
+    margin: 0;
+}
+
+.numbers dt {
+    font-size: clamp(1.3rem, 2.4vw, 1.7rem);
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+    line-height: 1.1;
+    margin-bottom: 5px;
+}
+
+.numbers dd {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--muted);
+}
+
+.numbers .foot {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+}
+
+/* figures lifted from the repo */
+.post > figure { margin: 2.2rem 0; max-width: none; }
+
+.post > figure img {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    padding: 14px;
+}
+
+@media (max-width: 700px) {
+    .post-card { grid-template-columns: 1fr; }
+    .post-card-media { max-width: 320px; }
 }
